@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">ArchTune</string>
+    <string name="widget_description">Text-first player with adaptive playback controls</string>
+    <string name="widget_album_art_description">Framed album cover with a play button and a caption when expanded</string>
+    <string name="widget_now_playing_card_description">Split artwork card with track details and playback controls</string>
+    <string name="widget_playback_deck_description">Circular album artwork with track details and playback controls</string>
+    <string name="widget_playback_capsule_description">Compact player with circular artwork and a play button</string>
+    <string name="widget_playback_spotlight_description">Full artwork with track details and controls when expanded</string>
+    <string name="widget_playback_command_description">Large playback buttons with track details</string>
+    <string name="widget_listening_insights_description">Scrollable listening time, recent songs, genres, and recommendations</string>
+    <string name="widget_player_name">Music player</string>
+    <string name="widget_album_art_name">Album frame</string>
+    <string name="widget_now_playing_card_name">Now playing card</string>
+    <string name="widget_playback_deck_name">Record deck</string>
+    <string name="widget_playback_capsule_name">Playback capsule</string>
+    <string name="widget_playback_spotlight_name">Artwork spotlight</string>
+    <string name="widget_playback_command_name">Playback remote</string>
+    <string name="widget_listening_insights_name">Listening journal</string>
+</resources>
