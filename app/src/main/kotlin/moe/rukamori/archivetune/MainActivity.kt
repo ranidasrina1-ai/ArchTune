@@ -29,6 +29,7 @@ import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
@@ -341,7 +342,6 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 
-private const val TOGETHER_LAN_PERMISSION_REQUEST = 0x5441
 
 @Suppress("DEPRECATION", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @AndroidEntryPoint
@@ -369,6 +369,21 @@ class MainActivity : ComponentActivity() {
     private var isAodScreenOffReceiverRegistered = false
     private var pendingTogetherJoinLink: String? = null
     private var requestedTogetherLanPermission = false
+    private val togetherLanPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            requestedTogetherLanPermission = false
+            if (granted) {
+                joinPendingTogetherIfReady()
+            } else {
+                pendingTogetherJoinLink = null
+                Toast
+                    .makeText(
+                        this,
+                        R.string.together_local_network_permission_required,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+        }
     private var pendingBackupRestoreUri by mutableStateOf<Uri?>(null)
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
 
@@ -487,9 +502,11 @@ class MainActivity : ComponentActivity() {
             moe.rukamori.archivetune.together.TogetherLink.decode(pending)
                 ?: return
         val permission = TogetherPermissions.localNetworkPermission()
-        if (permission != null && !TogetherPermissions.hasLocalNetwork(this) && !requestedTogetherLanPermission) {
-            requestedTogetherLanPermission = true
-            requestPermissions(arrayOf(permission), TOGETHER_LAN_PERMISSION_REQUEST)
+        if (permission != null && !TogetherPermissions.hasLocalNetwork(this)) {
+            if (!requestedTogetherLanPermission) {
+                requestedTogetherLanPermission = true
+                togetherLanPermissionLauncher.launch(permission)
+            }
             return
         }
         val connection = playerConnection ?: return
@@ -504,27 +521,6 @@ class MainActivity : ComponentActivity() {
             withContext(Dispatchers.Main) {
                 connection.service.joinTogether(pending, displayName)
             }
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != TOGETHER_LAN_PERMISSION_REQUEST) return
-        requestedTogetherLanPermission = false
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            joinPendingTogetherIfReady()
-        } else {
-            pendingTogetherJoinLink = null
-            Toast
-                .makeText(
-                    this,
-                    R.string.together_local_network_permission_required,
-                    Toast.LENGTH_SHORT,
-                ).show()
         }
     }
 

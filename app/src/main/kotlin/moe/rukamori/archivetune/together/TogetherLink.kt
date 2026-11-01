@@ -7,7 +7,7 @@
 
 package moe.rukamori.archivetune.together
 
-import java.net.URI
+import android.net.Uri
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
@@ -45,7 +45,7 @@ object TogetherLink {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
 
-        val asUri = runCatching { URI(trimmed) }.getOrNull()
+        val asUri = runCatching { Uri.parse(trimmed) }.getOrNull()
         if (asUri != null) {
             decodeShortLink(asUri)?.let { return it }
             decodeDeepLink(asUri)?.let { return it }
@@ -56,7 +56,7 @@ object TogetherLink {
         return null
     }
 
-    private fun decodeShortLink(uri: URI): TogetherJoinInfo? {
+    private fun decodeShortLink(uri: Uri): TogetherJoinInfo? {
         if (!uri.scheme.equals("archivetune", ignoreCase = true)) return null
         val authority = uri.host?.lowercase() ?: uri.authority?.lowercase() ?: return null
         if (authority != "t") return null
@@ -78,7 +78,7 @@ object TogetherLink {
         return TogetherJoinInfo(host = host, port = port, sessionId = key, sessionKey = key)
     }
 
-    private fun decodeDeepLink(uri: URI): TogetherJoinInfo? {
+    private fun decodeDeepLink(uri: Uri): TogetherJoinInfo? {
         if (!uri.scheme.equals("archivetune", ignoreCase = true)) return null
         val authority = uri.host?.lowercase() ?: uri.authority?.lowercase() ?: return null
         if (authority != "together") return null
@@ -95,7 +95,7 @@ object TogetherLink {
         return TogetherJoinInfo(host = host, port = port, sessionId = sid, sessionKey = key)
     }
 
-    private fun decodeWsUrl(uri: URI): TogetherJoinInfo? {
+    private fun decodeWsUrl(uri: Uri): TogetherJoinInfo? {
         val scheme = uri.scheme?.lowercase() ?: return null
         if (scheme != "ws" && scheme != "wss" && scheme != "http" && scheme != "https") return null
 

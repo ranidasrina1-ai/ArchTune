@@ -270,6 +270,7 @@ fun MusicTogetherScreen(
                         model = state.model,
                         useSupportingPane = useSupportingPane,
                         viewModel = viewModel,
+                        onLanAction = runLanAction,
                     )
                 }
             }
@@ -282,6 +283,7 @@ private fun MusicTogetherContent(
     model: MusicTogetherUiModel,
     useSupportingPane: Boolean,
     viewModel: MusicTogetherViewModel,
+    onLanAction: (() -> Unit) -> Unit,
 ) {
     if (useSupportingPane) {
         Row(
@@ -318,7 +320,7 @@ private fun MusicTogetherContent(
                             host = model.host,
                             viewModel = viewModel,
                             onStart = {
-                                if (model.host.onlineMode) viewModel.startSession() else runLanAction(viewModel::startSession)
+                                if (model.host.onlineMode) viewModel.startSession() else onLanAction(viewModel::startSession)
                             },
                         )
                     }
@@ -329,7 +331,7 @@ private fun MusicTogetherContent(
                             join = model.join,
                             viewModel = viewModel,
                             onJoin = {
-                                if (model.join.onlineMode) viewModel.joinSession() else runLanAction(viewModel::joinSession)
+                                if (model.join.onlineMode) viewModel.joinSession() else onLanAction(viewModel::joinSession)
                             },
                         )
                     }
@@ -397,7 +399,7 @@ private fun MusicTogetherContent(
                             host = model.host,
                             viewModel = viewModel,
                             onStart = {
-                                if (model.host.onlineMode) viewModel.startSession() else runLanAction(viewModel::startSession)
+                                if (model.host.onlineMode) viewModel.startSession() else onLanAction(viewModel::startSession)
                             },
                         )
                 }
@@ -408,7 +410,7 @@ private fun MusicTogetherContent(
                             join = model.join,
                             viewModel = viewModel,
                             onJoin = {
-                                if (model.join.onlineMode) viewModel.joinSession() else runLanAction(viewModel::joinSession)
+                                if (model.join.onlineMode) viewModel.joinSession() else onLanAction(viewModel::joinSession)
                             },
                         )
                 }
