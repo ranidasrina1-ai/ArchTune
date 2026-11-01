@@ -83,7 +83,7 @@ object TogetherLink {
         val authority = uri.host?.lowercase() ?: uri.authority?.lowercase() ?: return null
         if (authority != "together") return null
 
-        val params = parseQuery(uri.rawQuery)
+        val params = parseQuery(uri.encodedQuery)
         val host = params["host"]?.trim().orEmpty()
         val port = params["port"]?.toIntOrNull()
         val sid = params["sid"]?.trim().orEmpty()
@@ -107,7 +107,7 @@ object TogetherLink {
                 else -> 80
             }
 
-        val params = parseQuery(uri.rawQuery)
+        val params = parseQuery(uri.encodedQuery)
         val sid = params["sid"]?.trim().orEmpty()
         val key = params["key"]?.trim().orEmpty()
 
