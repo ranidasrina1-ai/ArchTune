@@ -647,7 +647,7 @@ private fun SessionShareCard(
                 maxLines = sessionShare.maxLines,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (sessionShare.value.startsWith("archivetune://t/")) {
+            if (sessionShare.value.startsWith("archtune://t/") || sessionShare.value.startsWith("archivetune://t/")) {
                 JoinQrCode(
                     link = sessionShare.value,
                     modifier =

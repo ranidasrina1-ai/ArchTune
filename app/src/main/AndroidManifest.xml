@@ -98,6 +98,12 @@
                 <data
                     android:host="t"
                     android:scheme="archivetune" />
+                <data
+                    android:host="together"
+                    android:scheme="archtune" />
+                <data
+                    android:host="t"
+                    android:scheme="archtune" />
             </intent-filter>
 
             <!-- Youtube filter -->

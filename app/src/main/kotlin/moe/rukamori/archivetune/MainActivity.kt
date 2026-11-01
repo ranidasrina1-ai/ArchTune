@@ -2901,7 +2901,8 @@ class MainActivity : ComponentActivity() {
         val coroutineScope = lifecycleScope
 
         val authority = uri.authority?.lowercase()
-        if (uri.scheme.equals("archivetune", ignoreCase = true) && (authority == "together" || authority == "t")) {
+        val isTogetherScheme = uri.scheme.equals("archtune", ignoreCase = true) || uri.scheme.equals("archivetune", ignoreCase = true)
+        if (isTogetherScheme && (authority == "together" || authority == "t")) {
             pendingTogetherJoinLink = uri.toString()
             startMusicServiceSafely()
             joinPendingTogetherIfReady()

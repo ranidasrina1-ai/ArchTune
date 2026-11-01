@@ -22,9 +22,9 @@ data class TogetherJoinInfo(
 
     fun toDeepLink(): String =
         if (sessionId == sessionKey) {
-            "archivetune://t/$host:$port/$sessionKey"
+            "archtune://t/$host:$port/$sessionKey"
         } else {
-            "archivetune://together?host=$host&port=$port&sid=$sessionId&key=$sessionKey"
+            "archtune://together?host=$host&port=$port&sid=$sessionId&key=$sessionKey"
         }
 }
 
@@ -57,7 +57,7 @@ object TogetherLink {
     }
 
     private fun decodeShortLink(uri: Uri): TogetherJoinInfo? {
-        if (!uri.scheme.equals("archivetune", ignoreCase = true)) return null
+        if (!uri.isTogetherScheme()) return null
         val authority = uri.host?.lowercase() ?: uri.authority?.lowercase() ?: return null
         if (authority != "t") return null
 
@@ -79,7 +79,7 @@ object TogetherLink {
     }
 
     private fun decodeDeepLink(uri: Uri): TogetherJoinInfo? {
-        if (!uri.scheme.equals("archivetune", ignoreCase = true)) return null
+        if (!uri.isTogetherScheme()) return null
         val authority = uri.host?.lowercase() ?: uri.authority?.lowercase() ?: return null
         if (authority != "together") return null
 
@@ -129,6 +129,9 @@ object TogetherLink {
         if (port !in 1..65535) return null
         return TogetherJoinInfo(host = host, port = port, sessionId = sid, sessionKey = key)
     }
+
+    private fun Uri.isTogetherScheme(): Boolean =
+        scheme.equals("archtune", ignoreCase = true) || scheme.equals("archivetune", ignoreCase = true)
 
     private fun parseQuery(rawQuery: String?): Map<String, String> {
         if (rawQuery.isNullOrBlank()) return emptyMap()
