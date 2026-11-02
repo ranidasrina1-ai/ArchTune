@@ -58,6 +58,16 @@ sealed interface TogetherClientEvent {
         val request: AddTrackRequest,
     ) : TogetherClientEvent
 
+    data class SyncStarted(
+        val sessionId: String,
+    ) : TogetherClientEvent
+
+    data class PlayTogetherRequested(
+        val sessionId: String,
+        val positionMs: Long,
+        val sentAtElapsedRealtimeMs: Long,
+    ) : TogetherClientEvent
+
     data class ServerIssue(
         val message: String,
         val code: String? = null,
@@ -461,6 +471,35 @@ class TogetherClient(
                             is AddTrackRequest -> {
                                 if (message.sessionId == sessionId) {
                                     _events.tryEmit(TogetherClientEvent.AddTrackRequested(message))
+                                }
+                            }
+
+                            is SyncStart -> {
+                                if (message.sessionId == sessionId) {
+                                    _events.tryEmit(TogetherClientEvent.SyncStarted(message.sessionId))
+                                    val selfId = selfParticipantId
+                                    if (selfId != null) {
+                                        runCatching {
+                                            session.send(
+                                                TogetherJson.json.encodeToString(
+                                                    TogetherMessage.serializer(),
+                                                    SyncReady(sessionId = sessionId, participantId = selfId),
+                                                ),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            is PlayTogether -> {
+                                if (message.sessionId == sessionId) {
+                                    _events.tryEmit(
+                                        TogetherClientEvent.PlayTogetherRequested(
+                                            sessionId = message.sessionId,
+                                            positionMs = message.positionMs,
+                                            sentAtElapsedRealtimeMs = message.sentAtElapsedRealtimeMs,
+                                        ),
+                                    )
                                 }
                             }
 

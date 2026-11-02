@@ -835,6 +835,10 @@ class MusicService :
     private var togetherHeartbeatJob: Job? = null
     private var togetherHostInactivityJob: Job? = null
     private var togetherHostInactivityEndSession: (suspend () -> Unit)? = null
+    private var togetherHostSyncJob: Job? = null
+    private var togetherHostSyncInProgress = false
+    private var togetherHostLastBroadcastPlaying: Boolean? = null
+    private var togetherClientSyncInProgress = false
     private var togetherClock: moe.rukamori.archivetune.together.TogetherClock? = null
     private var togetherSelfParticipantId: String? = null
     private var togetherAuthorityParticipantId: String? = null
@@ -4936,6 +4940,7 @@ class MusicService :
                             if (togetherAuthorityParticipantId == null || togetherAuthorityParticipantId == togetherHostId) {
                                 val state = buildTogetherRoomState(sessionId = sessionId, hostId = togetherHostId)
                                 startedServer.broadcastRoomState(state)
+                                maybeBeginTogetherHostSync(startedServer, sessionId, state.isPlaying)
                                 scope.launch(SilentHandler) {
                                     val hosting = togetherSessionState.value as? moe.rukamori.archivetune.together.TogetherSessionState.Hosting
                                     if (hosting?.sessionId == sessionId) {
@@ -5270,6 +5275,14 @@ class MusicService :
                                 }
                             }
 
+                            is moe.rukamori.archivetune.together.TogetherClientEvent.SyncStarted -> {
+                                handleTogetherClientSyncStarted()
+                            }
+
+                            is moe.rukamori.archivetune.together.TogetherClientEvent.PlayTogetherRequested -> {
+                                handleTogetherClientPlayTogether(event.positionMs)
+                            }
+
                             is moe.rukamori.archivetune.together.TogetherClientEvent.JoinDecision -> {
                                 if (!event.decision.approved) {
                                     scope.launch(SilentHandler) {
@@ -5525,6 +5538,14 @@ class MusicService :
                                 ) {
                                     applyHostAddTrack(event.request.track, event.request.mode)
                                 }
+                            }
+
+                            is moe.rukamori.archivetune.together.TogetherClientEvent.SyncStarted -> {
+                                handleTogetherClientSyncStarted()
+                            }
+
+                            is moe.rukamori.archivetune.together.TogetherClientEvent.PlayTogetherRequested -> {
+                                handleTogetherClientPlayTogether(event.positionMs)
                             }
 
                             is moe.rukamori.archivetune.together.TogetherClientEvent.JoinDecision -> {
@@ -5860,6 +5881,13 @@ class MusicService :
                 }
             }
 
+            is moe.rukamori.archivetune.together.TogetherServerEvent.SyncCompleted -> {
+                val server = togetherServer
+                if (server != null && !togetherIsOnlineSession) {
+                    completeTogetherHostSync(server, event.sessionId)
+                }
+            }
+
             is moe.rukamori.archivetune.together.TogetherServerEvent.HostTransferred -> {
                 val currentState = togetherSessionState.value
                 val sessionId =
@@ -5877,6 +5905,11 @@ class MusicService :
                 } else {
                     cancelTogetherHostInactivityTimeout()
                     togetherHostInactivityEndSession = null
+        togetherHostSyncJob?.cancel()
+        togetherHostSyncJob = null
+        togetherHostSyncInProgress = false
+        togetherHostLastBroadcastPlaying = null
+        togetherClientSyncInProgress = false
                 }
                 handleTogetherHostTransferred(event.participantId)
             }
@@ -5902,6 +5935,72 @@ class MusicService :
             else -> {
                 Unit
             }
+        }
+    }
+
+    private fun maybeBeginTogetherHostSync(
+        server: moe.rukamori.archivetune.together.TogetherServer,
+        sessionId: String,
+        isPlaying: Boolean,
+    ) {
+        val previous = togetherHostLastBroadcastPlaying
+        togetherHostLastBroadcastPlaying = isPlaying
+        if (previous == null || !isPlaying || previous || togetherHostSyncInProgress) return
+        val guestCount = server.currentParticipants().count { !it.isHost && !it.isPending }
+        if (guestCount <= 0) return
+        togetherHostSyncInProgress = true
+        togetherHostSyncJob?.cancel()
+        togetherHostSyncJob =
+            scope.launch(SilentHandler) {
+                val targetCount = server.beginSyncStart(sessionId, togetherHostId)
+                if (targetCount <= 0) {
+                    completeTogetherHostSync(server, sessionId)
+                    return@launch
+                }
+                kotlinx.coroutines.delay(1500)
+                if (togetherHostSyncInProgress) {
+                    completeTogetherHostSync(server, sessionId)
+                }
+            }
+    }
+
+    private fun completeTogetherHostSync(
+        server: moe.rukamori.archivetune.together.TogetherServer,
+        sessionId: String,
+    ) {
+        if (!togetherHostSyncInProgress) return
+        togetherHostSyncInProgress = false
+        togetherHostSyncJob?.cancel()
+        togetherHostSyncJob = null
+        scope.launch(SilentHandler) {
+            val position = player.currentPosition.coerceAtLeast(0L)
+            server.broadcastPlayTogether(
+                sessionId = sessionId,
+                positionMs = position,
+                sentAtElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime(),
+            )
+        }
+    }
+
+    private fun effectiveTogetherRemotePlayWhenReady(isPlaying: Boolean): Boolean =
+        if (togetherClientSyncInProgress) false else isPlaying
+
+    private fun handleTogetherClientSyncStarted() {
+        togetherClientSyncInProgress = true
+        scope.launch(SilentHandler) {
+            if (player.playWhenReady) player.pause()
+        }
+    }
+
+    private fun handleTogetherClientPlayTogether(positionMs: Long) {
+        togetherClientSyncInProgress = false
+        scope.launch(SilentHandler) {
+            val target = positionMs.coerceAtLeast(0L)
+            if (kotlin.math.abs(player.currentPosition - target) > 120L) {
+                player.seekTo(target)
+            }
+            player.prepare()
+            player.playWhenReady = true
         }
     }
 
@@ -6252,7 +6351,7 @@ class MusicService :
                 player.prepare()
                 player.repeatMode = state.repeatMode
                 player.shuffleModeEnabled = state.shuffleEnabled
-                player.playWhenReady = state.isPlaying
+                player.playWhenReady = effectiveTogetherRemotePlayWhenReady(state.isPlaying)
                 togetherLastRemoteAppliedIndex = startIndex
             } else {
                 val index =
@@ -6268,12 +6367,12 @@ class MusicService :
                     if (player.shuffleModeEnabled != state.shuffleEnabled) player.shuffleModeEnabled = state.shuffleEnabled
                     player.seekTo(index, targetPos)
                     player.prepare()
-                    player.playWhenReady = state.isPlaying
+                    player.playWhenReady = effectiveTogetherRemotePlayWhenReady(state.isPlaying)
                 } else {
                     val playbackStateChanged = player.playWhenReady != state.isPlaying
                     if (player.repeatMode != state.repeatMode) player.repeatMode = state.repeatMode
                     if (player.shuffleModeEnabled != state.shuffleEnabled) player.shuffleModeEnabled = state.shuffleEnabled
-                    if (playbackStateChanged) player.playWhenReady = state.isPlaying
+                    if (playbackStateChanged) player.playWhenReady = effectiveTogetherRemotePlayWhenReady(state.isPlaying)
                     val shouldSeekForDrift =
                         TogetherPlaybackSync.shouldSeekForDrift(
                             currentPositionMs = player.currentPosition,

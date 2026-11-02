@@ -109,6 +109,7 @@ import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.together.TogetherLink
 import moe.rukamori.archivetune.together.TogetherPermissions
 import moe.rukamori.archivetune.ui.component.TextFieldDialog
 import moe.rukamori.archivetune.ui.utils.appBarScrollBehavior
@@ -143,6 +144,7 @@ fun MusicTogetherScreen(
     val useSupportingPane = windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
     var pendingLanAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showScanner by remember { mutableStateOf(false) }
     val lanPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             val action = pendingLanAction
@@ -271,10 +273,26 @@ fun MusicTogetherScreen(
                         useSupportingPane = useSupportingPane,
                         viewModel = viewModel,
                         onLanAction = runLanAction,
+                        onScanQr = { showScanner = true },
                     )
                 }
             }
         }
+    }
+    if (showScanner) {
+        QrScannerDialog(
+            onDismiss = { showScanner = false },
+            onResult = { raw ->
+                showScanner = false
+                val info = TogetherLink.decode(raw)
+                if (info != null) {
+                    val link = TogetherLink.encode(info)
+                    runLanAction { viewModel.submitJoinInput(link) }
+                } else {
+                    Toast.makeText(context, R.string.invalid_link, Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
     }
 }
 
@@ -284,6 +302,7 @@ private fun MusicTogetherContent(
     useSupportingPane: Boolean,
     viewModel: MusicTogetherViewModel,
     onLanAction: (() -> Unit) -> Unit,
+    onScanQr: () -> Unit,
 ) {
     if (useSupportingPane) {
         Row(
@@ -333,6 +352,7 @@ private fun MusicTogetherContent(
                             onJoin = {
                                 if (model.join.onlineMode) viewModel.joinSession() else onLanAction(viewModel::joinSession)
                             },
+                            onScanQr = onScanQr,
                         )
                     }
                 }
@@ -412,6 +432,7 @@ private fun MusicTogetherContent(
                             onJoin = {
                                 if (model.join.onlineMode) viewModel.joinSession() else onLanAction(viewModel::joinSession)
                             },
+                            onScanQr = onScanQr,
                         )
                 }
             }
@@ -886,6 +907,7 @@ private fun JoinControlsCard(
     join: MusicTogetherJoinUiModel,
     viewModel: MusicTogetherViewModel,
     onJoin: () -> Unit,
+    onScanQr: () -> Unit,
 ) {
     SectionCard(
         iconResId = R.drawable.multi_user,
@@ -965,6 +987,14 @@ private fun JoinControlsCard(
                     Text(text = stringResource(R.string.join))
                 }
             }
+        }
+        TextButton(
+            onClick = onScanQr,
+            enabled = !join.disabled && !join.joining,
+            modifier = Modifier.fillMaxWidth(),
+            shapes = ButtonDefaults.shapes(),
+        ) {
+            Text(text = "Scan QR code")
         }
     }
 }

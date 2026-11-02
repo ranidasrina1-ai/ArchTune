@@ -57,6 +57,10 @@ sealed interface TogetherServerEvent {
         val participantId: String,
     ) : TogetherServerEvent
 
+    data class SyncCompleted(
+        val sessionId: String,
+    ) : TogetherServerEvent
+
     data class Error(
         val message: String,
         val throwable: Throwable? = null,
@@ -89,6 +93,11 @@ class TogetherServer(
 
     private val clients = ConcurrentHashMap<String, Client>()
     private val bannedClientIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val syncReadyParticipants = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    @Volatile
+    private var syncExpectedCount: Int = 0
+    @Volatile
+    private var syncSessionId: String? = null
 
     var onEvent: ((TogetherServerEvent) -> Unit)? = null
 
@@ -305,6 +314,31 @@ class TogetherServer(
         }
     }
 
+    suspend fun beginSyncStart(sessionId: String, hostParticipantId: String): Int {
+        val targets = clients.values.filter { !it.pending }
+        syncReadyParticipants.clear()
+        syncExpectedCount = targets.size
+        syncSessionId = sessionId
+        val message = SyncStart(sessionId = sessionId, participantId = hostParticipantId)
+        val encoded = TogetherJson.json.encodeToString(TogetherMessage.serializer(), message)
+        targets.forEach { client -> runCatching { client.session.send(encoded) } }
+        return targets.size
+    }
+
+    suspend fun broadcastPlayTogether(
+        sessionId: String,
+        positionMs: Long,
+        sentAtElapsedRealtimeMs: Long,
+    ) {
+        val message = PlayTogether(
+            sessionId = sessionId,
+            positionMs = positionMs,
+            sentAtElapsedRealtimeMs = sentAtElapsedRealtimeMs,
+        )
+        val encoded = TogetherJson.json.encodeToString(TogetherMessage.serializer(), message)
+        clients.values.forEach { client -> runCatching { client.session.send(encoded) } }
+    }
+
     private suspend fun resetAuthorityToHost() {
         val shouldNotify =
             mutex.withLock {
@@ -486,6 +520,16 @@ class TogetherServer(
                         if (!client.pending) {
                             if (!sendToAuthority(message)) {
                                 onEvent?.invoke(TogetherServerEvent.AddTrackRequested(message))
+                            }
+                        }
+                    }
+
+                    is SyncReady -> {
+                        if (syncSessionId == sessionId && message.sessionId == sessionId) {
+                            syncReadyParticipants.add(message.participantId)
+                            if (syncReadyParticipants.size >= syncExpectedCount) {
+                                syncSessionId = null
+                                onEvent?.invoke(TogetherServerEvent.SyncCompleted(sessionId))
                             }
                         }
                     }

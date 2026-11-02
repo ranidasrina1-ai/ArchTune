@@ -176,6 +176,31 @@ enum class ServerRole {
 }
 
 @Serializable
+@SerialName("sync_start")
+@Immutable
+data class SyncStart(
+    val sessionId: String,
+    val participantId: String,
+) : TogetherMessage
+
+@Serializable
+@SerialName("sync_ready")
+@Immutable
+data class SyncReady(
+    val sessionId: String,
+    val participantId: String,
+) : TogetherMessage
+
+@Serializable
+@SerialName("play_together")
+@Immutable
+data class PlayTogether(
+    val sessionId: String,
+    val positionMs: Long,
+    val sentAtElapsedRealtimeMs: Long,
+) : TogetherMessage
+
+@Serializable
 enum class AddTrackMode {
     PLAY_NEXT,
     ADD_TO_QUEUE,
